@@ -65,18 +65,22 @@ _WEEK_INTERVAL = 60 * 60 * 12
 How often to check what the current week is. By default, it is twice a day.
 """
 
-#_CUR_SCHEDULE = "http://www.nfl.com/liveupdate/scorestrip/ss.xml"
-# """
-# Pinged infrequently to discover the current week number, year and week type.
-# The actual schedule of games is taken from the schedule module.
-# """
-_CUR_SCHEDULE = "http://www.nfl.com/liveupdate/scorestrip/postseason/ss.xml"
+_PRE_REG_SCHEDULE = "http://www.nfl.com/liveupdate/scorestrip/ss.xml"
+"""
+The URL for the XML schedule of the pre-season and regular season. This is
+only used during the pre and regular seasons.
+"""
 
+_POST_SCHEDULE = "http://www.nfl.com/liveupdate/scorestrip/postseason/ss.xml"
 """
 The URL for the XML schedule of the post season. This is only used
 during the post season.
+"""
 
-TODO: How do we know if it's the post season?
+_CUR_SCHEDULE = None
+"""
+Pinged infrequently to discover the current week number, year and week type.
+The actual schedule of games is taken from the schedule module.
 """
 
 _cur_week = None
@@ -353,12 +357,26 @@ def _now():
 
 
 def _update_week_number():
-    global _cur_week, _cur_year, _cur_season_phase
+    global _cur_week, _cur_year, _cur_season_phase, _CUR_SCHEDULE
 
-    dom = xml.parse(urllib2.urlopen(_CUR_SCHEDULE, timeout=5))
+    dom = xml.parse(urllib2.urlopen(_PRE_REG_SCHEDULE, timeout=5))
     gms = dom.getElementsByTagName('gms')[0]
     _cur_week = int(gms.getAttribute('w'))
     _cur_year = int(gms.getAttribute('y'))
+
+    domPost = xml.parse(urllib2.urlopen(_POST_SCHEDULE, timeout=5))
+    gmsPost = domPost.getElementsByTagName('gms')[0]
+    _post_week = int(gmsPost.getAttribute('w'))
+    _post_year = int(gmsPost.getAttribute('y'))
+
+    # The y attr is the season so if post y >= pre/reg y, use post
+    if _post_year >= _cur_year:
+        gms = gmsPost
+        _cur_year = _post_year
+        _cur_week = _post_week
+        _CUR_SCHEDULE = _POST_SCHEDULE
+    else:
+        _CUR_SCHEDULE = _PRE_REG_SCHEDULE
 
     phase = gms.getAttribute('t').strip()
     if phase == 'P':
